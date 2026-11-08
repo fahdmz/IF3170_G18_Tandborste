@@ -1,30 +1,38 @@
-def confusion_matrix(y_true, y_pred):
+import numpy as np
+
+
+def confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
     raise NotImplementedError
 
 
-def accuracy(y_true, y_pred):
+def accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     raise NotImplementedError
 
 
-def precision(y_true, y_pred):
+def precision(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     raise NotImplementedError
 
 
-def recall(y_true, y_pred):
+def recall(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     raise NotImplementedError
 
 
-def f1_score(y_true, y_pred):
+def f1_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     raise NotImplementedError
 
 
-def roc_auc(y_true, y_score):
+def roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
     raise NotImplementedError
 
 
-def classification_report(y_true, y_pred):
+def classification_report(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     raise NotImplementedError
 
 
-def misclassification_cost(y_true, y_pred, fp_cost=2.0, fn_cost=1.0):
+def misclassification_cost(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    fp_cost: float = 2.0,
+    fn_cost: float = 1.0,
+) -> float:
     raise NotImplementedError
