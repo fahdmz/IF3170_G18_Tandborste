@@ -459,4 +459,67 @@ class DecisionTree(BaseClassifier):
         return leaves
 
     def export_graph(self, path, top_n=None, feature_names=None):
-        raise NotImplementedError
+        """Write UTF-8 DOT; top_n limits actual BFS nodes, including the root.
+
+        Hidden branches are noted on their displayed parent. This serializer
+        only reads fitted nodes and has no dependency on a graphics renderer.
+        """
+        from pathlib import Path
+
+        self._check_is_fitted()
+        path = Path(path)
+        if path.suffix.lower() != ".dot":
+            raise ValueError("export_graph requires a .dot path")
+        if top_n is not None and (
+            isinstance(top_n, bool) or not isinstance(top_n, Integral) or top_n <= 0
+        ):
+            raise ValueError("top_n must be a positive integer or None")
+        names = [f"x{i}" for i in range(self.n_features_in_)] if feature_names is None else list(feature_names)
+        if len(names) != self.n_features_in_:
+            raise ValueError("feature_names must match n_features_in_")
+
+        def escape(value):
+            return str(value).replace("\\", "\\\\").replace('"', '\\"').replace(
+                "\r\n", "\n"
+            ).replace("\r", "\n").replace("\n", "\\n")
+
+        # IDs and the queue are local: never attach export state to TreeNode.
+        nodes, edges, hidden = [self.tree_], [], {}
+        index = 0
+        while index < len(nodes):
+            node = nodes[index]
+            if not node.is_leaf:
+                if node.is_categorical:
+                    try:
+                        keys = sorted(node.children)
+                    except TypeError:
+                        keys = sorted(node.children, key=lambda key: (type(key).__name__, repr(key)))
+                else:
+                    keys = [key for key in ("le", "gt") if key in node.children]
+                for key in keys:
+                    if top_n is not None and len(nodes) >= top_n:
+                        hidden[index] = hidden.get(index, 0) + 1
+                        continue
+                    label = str(key) if node.is_categorical else ("<=" if key == "le" else ">")
+                    edges.append((index, len(nodes), label))
+                    nodes.append(node.children[key])
+            index += 1
+
+        lines = ["digraph DecisionTree {", "  node [shape=box];"]
+        for index, node in enumerate(nodes):
+            if node.is_leaf:
+                title = f"prediction = {node.prediction}"
+            elif node.is_categorical:
+                title = f"{names[node.feature_index]} (categorical)"
+            else:
+                title = f"{names[node.feature_index]} <= {node.threshold:.6g}"
+            counts = ", ".join(f"{count:.6g}" for count in node.class_distribution)
+            label = f"{title}\nmass = {node.n_samples:.6g}\ncounts = [{counts}]"
+            if index in hidden:
+                label += f"\n... {hidden[index]} branches hidden"
+            lines.append(f'  n{index} [label="{escape(label)}"];')
+        for parent, child, label in edges:
+            lines.append(f'  n{parent} -> n{child} [label="{escape(label)}"];')
+        lines.append("}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
