@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
+from math import expm1, log, sqrt
 from numbers import Integral, Real
+from statistics import NormalDist
 
 import numpy as np
 
@@ -7,6 +9,38 @@ from src.models.base import BaseClassifier
 
 
 _EPS = 1e-12
+_PRUNING_CF = 0.25
+_PRUNING_Z = NormalDist().inv_cdf(1 - _PRUNING_CF)
+
+
+# Upper-confidence error mathematics (with continuity correction) from Weka Stats:
+# https://raw.githubusercontent.com/Waikato/weka-3.8/master/weka/src/main/java/weka/classifiers/trees/j48/Stats.java
+def _estimated_errors(mass, error):
+    """Total pessimistic error E(N,e), approximated for effective float mass.
+
+    This is not bit-for-bit Weka: for N<1, interpolation ends at (N,N)
+    instead of evaluating an impossible observed error of 1.
+    """
+    if mass <= _EPS:
+        return 0.0
+    error = min(mass, max(0.0, error))
+    if error == 0:
+        estimate = -mass * expm1(log(_PRUNING_CF) / mass)
+    elif error < min(1.0, mass):
+        base = _estimated_errors(mass, 0.0)
+        endpoint = min(1.0, mass)
+        upper = mass if mass < 1.0 else _estimated_errors(mass, 1.0)
+        estimate = base + (error / endpoint) * (upper - base)
+    elif error + 0.5 >= mass:
+        estimate = mass
+    else:
+        z = _PRUNING_Z
+        fraction = (error + 0.5) / mass
+        estimate = mass * (
+            fraction + z * z / (2 * mass)
+            + z * sqrt(fraction * (1 - fraction) / mass + z * z / (4 * mass * mass))
+        ) / (1 + z * z / mass)
+    return min(mass, max(error, estimate))
 
 
 def _is_missing(value):
@@ -69,7 +103,7 @@ class TreeNode:
 
 
 class DecisionTree(BaseClassifier):
-    """C4.5-style tree with multiway categories and fractional missing values.
+    """C4.5-style tree with fractional missing values and pessimistic pruning.
 
     Splits and leaf limits use effective sample mass. Fractional routing can
     expand work on deep trees; max_depth and the sample limits control growth.
@@ -301,6 +335,38 @@ class DecisionTree(BaseClassifier):
             node.gain = split["gain"]
         return root
 
+    def _prune_tree(self, root):
+        """Replace subtrees bottom-up; return the surviving leaf error sum."""
+        pending = [(root, False)]
+        errors = []
+        while pending:
+            node, visited = pending.pop()
+            if not node.is_leaf and not visited:
+                pending.append((node, True))
+                pending.extend((child, False) for child in node.children.values())
+                continue
+            leaf_error = _estimated_errors(
+                node.n_samples, node.n_samples - max(node.class_distribution)
+            )
+            if node.is_leaf:
+                errors.append(leaf_error)
+                continue
+            # Post-order leaves one error total per processed child on the stack.
+            child_count = len(node.children)
+            subtree_error = sum(errors[-child_count:])
+            del errors[-child_count:]
+            if leaf_error <= subtree_error + _EPS:
+                node.is_leaf = True
+                node.children.clear()
+                node.feature_index = None
+                node.threshold = None
+                node.is_categorical = False
+                node.gain = 0.0
+                errors.append(leaf_error)
+            else:
+                errors.append(subtree_error)
+        return errors[0]
+
     def fit(self, X, y):
         shape = np.shape(X)
         if len(shape) != 2:
@@ -318,6 +384,7 @@ class DecisionTree(BaseClassifier):
             raise ValueError("y must contain only 0 and 1 without missing values")
         y = y.astype(np.intp)
         tree = self._grow_tree(X, y, np.ones(len(y)), categorical_features, 0)
+        self._prune_tree(tree)
         # Publish fitted state only after the whole fit succeeds, including refits.
         self.tree_ = tree
         self.n_features_in_ = X.shape[1]
