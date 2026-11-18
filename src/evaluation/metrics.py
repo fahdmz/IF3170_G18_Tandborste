@@ -178,6 +178,10 @@ def classification_report(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     }
 
 
+def macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return classification_report(y_true, y_pred)["macro avg"]["f1-score"]
+
+
 def misclassification_cost(
     y_true: np.ndarray,
     y_pred: np.ndarray,
