@@ -1,0 +1,12 @@
+model,implementation,split,decision_rule,threshold,tn,fp,fn,tp,cost
+KNN,from-scratch,pooled_oof,p_cancel >= threshold,0.45000000000000001,13004,1719,1820,5355,5258
+KNN,from-scratch,holdout,p_cancel >= threshold,0.45000000000000001,3244,437,425,1369,1299
+KNN,scikit-learn,pooled_oof,p_cancel >= threshold,0.45000000000000001,13004,1719,1820,5355,5258
+KNN,scikit-learn,holdout,p_cancel >= threshold,0.45000000000000001,3244,437,425,1369,1299
+Naive Bayes,from-scratch,pooled_oof,p_cancel >= threshold,0.5,12230,2493,3211,3964,8197
+Naive Bayes,from-scratch,holdout,p_cancel >= threshold,0.5,3040,641,778,1016,2060
+Naive Bayes,scikit-learn,pooled_oof,p_cancel >= threshold,0.90000000000000002,2174,12549,281,6894,25379
+Naive Bayes,scikit-learn,holdout,p_cancel >= threshold,0.90000000000000002,558,3123,58,1736,6304
+KNN,from-scratch,holdout,cost_default_0.50,0.5,3360,321,491,1303,1133
+KNN,from-scratch,holdout,cost_bayes_optimal,0.66666666666666663,3570,111,756,1038,978
+KNN,from-scratch,holdout,cost_oof_tuned,0.6647927998730826,3568,113,753,1041,979
