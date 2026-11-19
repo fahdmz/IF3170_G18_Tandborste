@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from sklearn.datasets import make_classification
 from sklearn.metrics import f1_score, roc_auc_score
 
@@ -10,6 +11,8 @@ from src.experiments.svm_experiments import (
     roc_auc,
     stratified_folds,
 )
+from src.evaluation.metrics import macro_f1 as team_macro_f1
+from src.evaluation.model_selection import StratifiedKFold, cross_validate
 from src.models.svm import SVM, PegasosSVM
 
 
@@ -60,3 +63,11 @@ def test_compare_with_sklearn_agrees():
     assert len(per_fold) == 2 * 2 * 3
     assert per_fold.loc[per_fold.config == "rbf", "agreement"].min() == 1.0
     assert per_fold.loc[per_fold.config == "pegasos", "agreement"].min() > 0.9
+
+
+def test_svm_works_with_team_cross_validate():
+    X, y = make_classification(n_samples=400, random_state=42)
+    scores = cross_validate(
+        SVM(kernel="rbf"), None, pd.DataFrame(X), pd.Series(y), StratifiedKFold(3), {"macro_f1": team_macro_f1}
+    )
+    assert len(scores["macro_f1"]) == 3 and min(scores["macro_f1"]) > 0.7

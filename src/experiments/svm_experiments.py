@@ -3,10 +3,12 @@
 Jalankan dari root repo:
     python -m src.experiments.svm_experiments            # perbandingan + Pegasos, tulis ke output/svm_comparison/
     python -m src.experiments.svm_experiments --tune     # tambah grid tuning SVM (lama, ~1 jam di 10 core)
+    python -m src.experiments.svm_experiments --team-cv  # perbandingan dengan cross_validate milik tim
 
-Fold, Macro F1, dan ROC AUC dihitung dengan NumPy di modul ini karena `src/evaluation` belum tersedia
-di `main`. Setelah `cross_validate` milik tim di-merge, angka akhir untuk laporan sebaiknya diulang dengan itu.
-sklearn hanya dipakai di `compare_with_sklearn` sebagai pembanding.
+Tuning dan `compare_with_sklearn` memakai fold, Macro F1, dan ROC AUC NumPy buatan modul ini, karena
+`cross_validate` tim hanya meneruskan label ke metrik (tidak bisa skor kontinu seperti ROC AUC atau threshold).
+`team_cv_comparison` mengulang perbandingan utama dengan `src.evaluation` tim agar angkanya konsisten dengan anggota lain.
+sklearn hanya dipakai sebagai pembanding.
 """
 import argparse
 import itertools
@@ -18,6 +20,8 @@ import numpy as np
 import pandas as pd
 
 from src import config, data
+from src.evaluation.metrics import accuracy, f1_score, macro_f1 as team_macro_f1, precision, recall
+from src.evaluation.model_selection import StratifiedKFold, cross_validate
 from src.models.svm import SVM, PegasosSVM
 from src.preprocessing.cleaning import clean_train
 from src.preprocessing.presets import make_numeric_pipeline, to_model_input
@@ -225,7 +229,41 @@ def pegasos_grid() -> list[dict]:
     ]
 
 
-def main(run_tuning: bool = False, n_jobs: int | None = None) -> None:
+def _team_cv_one(job):
+    name, impl, model = job
+    X, y = data.load_train()
+    num, cat = data.get_feature_types()
+    X, y = clean_train(X, y)
+    metrics = {"macro_f1": team_macro_f1, "f1": f1_score, "precision": precision, "recall": recall,
+               "accuracy": accuracy}
+    start = time.time()
+    scores = cross_validate(
+        model, lambda: make_numeric_pipeline(num, cat), X, y, StratifiedKFold(5, True, config.SEED), metrics
+    )
+    row = {"config": name, "impl": impl, "fit_predict_sec_per_fold": (time.time() - start) / 5}
+    for metric, values in scores.items():
+        row[metric] = float(np.mean(values))
+        row[metric + "_std"] = float(np.std(values))
+    return row
+
+
+def team_cv_comparison(n_jobs: int = 4) -> pd.DataFrame:
+    """Perbandingan scratch vs sklearn memakai `StratifiedKFold` dan `cross_validate` milik tim (pipeline di-fit per fold)."""
+    from sklearn.svm import SVC
+
+    jobs = []
+    for name, params in (
+        ("rbf_best_C3_g0.1", BEST_SVM_PARAMS),
+        ("rbf_default_C1_scale", {"kernel": "rbf", "C": 1.0, "gamma": "scale", "max_iter": -1}),
+    ):
+        jobs.append((name, "scratch", SVM(**params)))
+        jobs.append((name, "sklearn", SVC(kernel="rbf", C=params["C"], gamma=params["gamma"])))
+    with ProcessPoolExecutor(max_workers=min(n_jobs, len(jobs))) as ex:
+        rows = list(ex.map(_team_cv_one, jobs))
+    return pd.DataFrame(rows).round(4)
+
+
+def main(run_tuning: bool = False, n_jobs: int | None = None, team_cv: bool = False) -> None:
     n_jobs = n_jobs or max(1, min(8, (os.cpu_count() or 2) - 1))
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     folds = prepare_folds()
@@ -254,10 +292,16 @@ def main(run_tuning: bool = False, n_jobs: int | None = None) -> None:
     summary.to_csv(OUTPUT_DIR / "svm_scratch_vs_sklearn_summary.csv")
     print(summary.to_string())
 
+    if team_cv:
+        team = team_cv_comparison(n_jobs=n_jobs)
+        team.to_csv(OUTPUT_DIR / "svm_team_cv_comparison.csv", index=False)
+        print(team.to_string(index=False))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--tune", action="store_true", help="jalankan ulang grid tuning SVM (lama)")
+    parser.add_argument("--team-cv", action="store_true", help="perbandingan dengan cross_validate tim")
     parser.add_argument("--n-jobs", type=int, default=None)
     args = parser.parse_args()
-    main(run_tuning=args.tune, n_jobs=args.n_jobs)
+    main(run_tuning=args.tune, n_jobs=args.n_jobs, team_cv=args.team_cv)

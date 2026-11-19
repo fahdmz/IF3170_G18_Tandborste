@@ -24,7 +24,7 @@ svm = SVM(kernel="rbf", C=3.0, gamma=0.1, max_train_samples=None, max_iter=-1)
 
 ## Hasil perbandingan (5-fold, baris latih identik)
 
-Sumber: `output/svm_comparison/svm_scratch_vs_sklearn_summary.csv`, dibuat ulang dengan `python -m src.experiments.svm_experiments`.
+Sumber: `output/svm_comparison/svm_scratch_vs_sklearn_summary.csv`, dibuat ulang dengan `python -m src.experiments.svm_experiments` (fold NumPy sendiri; verifikasi dengan modul tim di bagian bawah).
 
 | Konfigurasi | Macro F1 scratch / sklearn | AUC | Fit scratch / sklearn (dtk) | Prediksi sama |
 | :--- | :--- | :--- | :--- | :--- |
@@ -53,7 +53,20 @@ Temuan utama:
 - Plot 2D bidang pemisah, margin f(x)=±1, dan support vector per kernel: `src/visualization/svm_boundary.py` (`plot_svm_kernels`). Gambarnya ada di `output/figures/svm_kernels_2d_synthetic.png` (data sintetis) dan `output/figures/svm_kernels_2d_pca.png` (data asli, 2 komponen PCA).
 - Algoritma optimasi di luar materi kelas: `PegasosSVM` (primal stochastic sub-gradient). Belum dicek di salindia bahwa Pegasos belum diajarkan. Referensinya ada di `docs/referensi_sementara.md`.
 
+## Verifikasi dengan modul evaluasi tim
+
+`output/svm_comparison/svm_team_cv_comparison.csv` dibuat dengan `StratifiedKFold` dan `cross_validate` dari `src/evaluation` (pipeline di-fit per fold), dijalankan lewat `python -m src.experiments.svm_experiments --team-cv`:
+
+| Konfigurasi | Impl | Macro F1 | F1 kelas batal | Recall | Akurasi |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| rbf C=3 γ=0.1 | scratch | 0.8209 ± 0.008 | 0.7527 | 0.7116 | 0.8469 |
+| rbf C=3 γ=0.1 | sklearn | 0.8209 ± 0.008 | 0.7528 | 0.7118 | 0.8469 |
+| rbf C=1 γ=scale | scratch | 0.7956 ± 0.005 | 0.7127 | 0.6469 | 0.8292 |
+| rbf C=1 γ=scale | sklearn | 0.7955 ± 0.005 | 0.7125 | 0.6467 | 0.8291 |
+
+`cross_validate` tim hanya meneruskan label ke metrik, jadi ROC AUC dan pencarian threshold (butuh skor kontinu) tetap dihitung oleh `src/experiments/svm_experiments.py` dengan fold NumPy sendiri.
+
 ## Belum dikerjakan
 
-- Angka di atas memakai fold dan metrik NumPy sendiri karena `src/evaluation` belum ada di `main`. Setelah `cross_validate` milik tim di-merge, perbandingan perlu dijalankan ulang dengan itu.
 - `predict_proba` (Platt scaling) tidak diimplementasikan. Untuk threshold dan ROC AUC cukup pakai `decision_function`.
+- Belum dicek di salindia bahwa Pegasos belum diajarkan (syarat bonus).
