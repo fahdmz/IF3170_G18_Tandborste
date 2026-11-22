@@ -2,6 +2,13 @@
 
 Daftar sumber metode dan kode yang diadaptasi, untuk dipindahkan ke laporan. Setiap anggota menambah bagiannya sendiri.
 
+## Logistic Regression (Anggota 4)
+
+| Dipakai di | Sumber |
+| :--- | :--- |
+| `src/models/logistic_regression.py` `_soft_threshold` (L1 proximal map for gradient descent and elastic net) | N. Parikh and S. Boyd, "Proximal Algorithms", *Foundations and Trends in Optimization* 1(3), 2014, section 6.5.2 (soft-thresholding). |
+| `src/models/logistic_regression.py` `AdamLogisticRegression` (optimization bonus outside the course slides) | D. P. Kingma and J. Ba, "Adam: A Method for Stochastic Optimization", *International Conference on Learning Representations*, 2015. Used: bias-corrected moments (Algorithm 1). The L1 part uses soft-thresholding scaled by the second-moment denominator. |
+
 ## SVM (Anggota 5)
 
 | Dipakai di | Sumber |
