@@ -25,7 +25,11 @@ class KNN(BaseClassifier):
         self.batch_size = batch_size
 
     def _validate_params(self) -> None:
-        if not isinstance(self.n_neighbors, Integral) or self.n_neighbors < 1:
+        if (
+            isinstance(self.n_neighbors, bool)
+            or not isinstance(self.n_neighbors, Integral)
+            or self.n_neighbors < 1
+        ):
             raise ValueError(f"n_neighbors must be an integer >= 1, got {self.n_neighbors}")
         if self.metric not in ("euclidean", "manhattan", "minkowski"):
             raise ValueError(
@@ -39,7 +43,11 @@ class KNN(BaseClassifier):
             raise ValueError(
                 f"weights must be 'uniform' or 'distance', got '{self.weights}'"
             )
-        if not isinstance(self.batch_size, Integral) or self.batch_size < 1:
+        if (
+            isinstance(self.batch_size, bool)
+            or not isinstance(self.batch_size, Integral)
+            or self.batch_size < 1
+        ):
             raise ValueError(f"batch_size must be an integer >= 1, got {self.batch_size}")
 
     def fit(self, X, y):
@@ -54,6 +62,8 @@ class KNN(BaseClassifier):
             raise ValueError("X and y cannot be empty")
         if X_arr.ndim != 2:
             raise ValueError(f"X must be 2D array, got {X_arr.ndim}D")
+        if not np.all(np.isfinite(X_arr)):
+            raise ValueError("X must not contain NaN or inf")
         if int(self.n_neighbors) > len(X_arr):
             raise ValueError(
                 f"n_neighbors={self.n_neighbors} cannot be greater than training sample count {len(X_arr)}"
@@ -62,9 +72,9 @@ class KNN(BaseClassifier):
         classes = np.unique(y_arr)
         if len(classes) < 2:
             raise ValueError("y must contain at least two distinct classes")
-        self.classes_ = classes
-        self.X_train_ = np.ascontiguousarray(X_arr)
-        self.y_train_ = y_arr
+        self.classes_ = np.array(classes, copy=True)
+        self.X_train_ = np.array(X_arr, dtype=float, copy=True, order="C")
+        self.y_train_ = np.array(y_arr, copy=True)
         return self
 
     def _compute_distances(self, X_batch: np.ndarray) -> np.ndarray:
@@ -99,6 +109,8 @@ class KNN(BaseClassifier):
             raise ValueError(
                 f"Feature count mismatch: expected {self.X_train_.shape[1]}, got {X_arr.shape[1]}"
             )
+        if not np.all(np.isfinite(X_arr)):
+            raise ValueError("X must not contain NaN or inf")
 
         n_samples = len(X_arr)
         n_classes = len(self.classes_)
