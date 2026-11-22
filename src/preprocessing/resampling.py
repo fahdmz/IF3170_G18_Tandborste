@@ -92,6 +92,8 @@ class SMOTE(BaseResampler):
         X = np.asarray(X, dtype="float64")
         y = np.asarray(y)
         _validate(X, y, self.sampling_strategy)
+        if not np.all(np.isfinite(X)):
+            raise ValueError("SMOTE membutuhkan nilai numerik yang finite, tanpa NaN atau inf")
         if self.k_neighbors < 1 or self.batch_size < 1:
             raise ValueError("k_neighbors dan batch_size harus >= 1")
         rng = self._rng()

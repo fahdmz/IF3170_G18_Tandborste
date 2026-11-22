@@ -9,6 +9,9 @@ from src.models.base import BaseClassifier
 def _is_missing_scalar(val) -> bool:
     if val is None:
         return True
+    # pandas.NA without importing pandas. Scratch models may only use NumPy.
+    if type(val).__name__ == "NAType":
+        return True
     if isinstance(val, (float, np.floating)):
         return bool(np.isnan(val))
     return False
@@ -35,9 +38,13 @@ class NaiveBayes(BaseClassifier):
         self.var_smoothing = var_smoothing
 
     def _validate_params(self) -> None:
-        if not isinstance(self.alpha, Real) or self.alpha < 0:
+        if isinstance(self.alpha, bool) or not isinstance(self.alpha, Real) or self.alpha < 0:
             raise ValueError(f"alpha must be a non-negative number, got {self.alpha}")
-        if not isinstance(self.var_smoothing, Real) or self.var_smoothing < 0:
+        if (
+            isinstance(self.var_smoothing, bool)
+            or not isinstance(self.var_smoothing, Real)
+            or self.var_smoothing < 0
+        ):
             raise ValueError(f"var_smoothing must be a non-negative number, got {self.var_smoothing}")
 
     def _resolve_feature_indices(self, n_features: int) -> tuple[list[int], list[int]]:

@@ -378,6 +378,8 @@ class DecisionTree(BaseClassifier):
         categorical_features = self._validate_parameters(shape[1])
         X = self._validate_X(X, categorical_features)
         y = np.asarray(y)
+        if y.ndim == 2 and y.shape[1] == 1:
+            y = np.ravel(y)
         if y.ndim != 1 or len(y) != len(X):
             raise ValueError("y must be one-dimensional with the same row count as X")
         if not np.isin(y, [0, 1]).all():
