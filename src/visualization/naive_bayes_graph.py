@@ -36,7 +36,6 @@ def plot_naive_bayes_graph(
     class_x = (n_features - 1) / 2.0
     class_y = 2.4
 
-    # Class node at top center
     ax.text(
         class_x,
         class_y,
@@ -54,12 +53,10 @@ def plot_naive_bayes_graph(
         fontweight="bold",
     )
 
-    # Feature nodes and directed arrows from Class Node -> Feature Nodes
     for i, name in enumerate(feature_names):
         feat_x = float(i)
         feat_y = 0.5
 
-        # Check if categorical or numerical for visual distinction
         is_cat = name in CATEGORICAL_COLS
         node_color = "#E8F0FE" if not is_cat else "#FEF3D6"
         edge_color = "#3C4043"
@@ -80,7 +77,6 @@ def plot_naive_bayes_graph(
             fontsize=8.5,
         )
 
-        # Directed edge: Class -> Feature
         ax.annotate(
             "",
             xy=(feat_x, feat_y + 0.35),

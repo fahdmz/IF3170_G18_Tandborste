@@ -12,7 +12,6 @@ from src.preprocessing.transformation import FeatureEngineer
 
 @pytest.fixture
 def hotel_frames():
-    # 32 observations per category keep common categories above min_count=20.
     codes = np.arange(96) % 3
     train = pd.DataFrame(1.0, index=np.arange(96), columns=NUMERICAL_COLS)
     train["num_adults"], train["num_children"] = 2.0, 0.0
@@ -46,7 +45,6 @@ def test_a1_pipeline_uses_actual_category_schema_without_mutating_raw_input(hote
     original_y = y.copy()
     pipeline = make_tree_pipeline(NUMERICAL_COLS, CATEGORICAL_COLS, **options)
     transformed_train = pipeline.fit_transform(train, y)
-    # Transform only: validation categories must never enter the fitted schema.
     transformed_validation = pipeline.transform(validation)
     X_train, categorical = to_model_input(transformed_train, CATEGORICAL_COLS)
     X_validation, validation_categorical = to_model_input(transformed_validation, CATEGORICAL_COLS)

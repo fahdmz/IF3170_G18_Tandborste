@@ -1,9 +1,4 @@
-"""Reproducible Decision Tree (C4.5) comparison and tuning runner for A3.
-
-Run from repository root:
-    python -m src.experiments.decision_tree --search none
-    python -m src.experiments.decision_tree --search grid
-"""
+"""Reproducible Decision Tree (C4.5) comparison and tuning runner for A3."""
 
 from __future__ import annotations
 
@@ -260,11 +255,7 @@ def select_macro_f1_threshold(
     candidates: tuple[float, ...] = THRESHOLD_CANDIDATES,
     tie_tol: float = 1e-12,
 ) -> dict[str, Any]:
-    """Select Macro F1 threshold from OOF class-1 probabilities with deterministic tie-breaking.
-
-    Prediction rule: y_pred = 1 if P(is_canceled=1) >= threshold else 0.
-    Tie-breaker: closest to 0.50 first, then smaller threshold.
-    """
+    """Select Macro F1 threshold from OOF class-1 probabilities with deterministic tie-breaking."""
     y_arr = np.asarray(y_true).ravel().astype(int)
     p_arr = np.asarray(y_proba, dtype=float).ravel()
     if len(y_arr) != len(p_arr) or len(y_arr) == 0:
@@ -880,7 +871,6 @@ def run_experiment(
     locked_threshold = None
     tuned_model = None
 
-    # Lock the hyperparameters and threshold using outer-train folds only.
     if search == "grid":
         param_grid = dict(GRID_PARAM_SPACE if grid_param_space is None else grid_param_space)
         grid_cv = StratifiedKFold(n_splits=cv_grid_splits, shuffle=True, random_state=config.SEED)

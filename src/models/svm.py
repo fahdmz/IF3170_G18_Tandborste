@@ -9,7 +9,7 @@ from src.models.base import BaseClassifier
 _KERNELS = ("linear", "poly", "rbf")
 _KERNEL_ALIASES = {"polynomial": "poly", "gaussian": "rbf"}
 _TAU = 1e-12
-# Batas memori matriks kernel penuh (byte). Di atas ini kolom kernel dihitung saat dibutuhkan dan di-cache.
+# Batas memori matriks kernel penuh (byte).
 _FULL_KERNEL_BYTES = 512 * 1024**2
 _CACHE_COLUMNS = 2048
 
@@ -26,7 +26,6 @@ def _is_number(value, kind):
 
 
 def _kernel_matrix(A, B, kernel, gamma, degree, coef0, A_sq=None, B_sq=None):
-    # Semua operasi in-place pada satu buffer agar memori puncak ~ satu matriks (len(A), len(B)).
     K = A @ B.T
     if kernel == "linear":
         return K
@@ -99,21 +98,7 @@ class _KernelColumns:
 
 
 class SVM(BaseClassifier):
-    """SVM biner dengan solver SMO pada bentuk dual.
-
-    Pemilihan working set memakai informasi orde kedua (WSS3) dan update dua variabel
-    mengikuti LIBSVM, sehingga hasilnya dapat dibandingkan langsung dengan sklearn SVC.
-
-    `max_iter` adalah jumlah maksimum pass, satu pass = n update pasangan SMO
-    (n = jumlah sampel latih). Nilai -1 berarti tanpa batas.
-    """
-
-    # Referensi:
-    # - J. Platt, "Sequential Minimal Optimization: A Fast Algorithm for Training Support
-    #   Vector Machines", Microsoft Research Technical Report MSR-TR-98-14, 1998.
-    # - R.-E. Fan, P.-H. Chen, C.-J. Lin, "Working Set Selection Using Second Order
-    #   Information for Training Support Vector Machines", JMLR 6, 2005.
-    # - C.-C. Chang, C.-J. Lin, "LIBSVM: A Library for Support Vector Machines", ACM TIST, 2011.
+    """SVM biner dengan solver SMO pada bentuk dual."""
 
     def __init__(
         self,
@@ -173,7 +158,6 @@ class SVM(BaseClassifier):
         rng = self._rng()
         neg_idx = np.flatnonzero(y == self.classes_[0])
         pos_idx = np.flatnonzero(y == self.classes_[1])
-        # Minimal satu sampel per kelas; sisa kuota diberikan ke kelas lain (total < n, jadi selalu muat).
         n_pos = min(max(1, int(round(total * len(pos_idx) / n))), len(pos_idx), total - 1)
         n_neg = min(total - n_pos, len(neg_idx))
         n_pos = total - n_neg
@@ -262,7 +246,6 @@ class SVM(BaseClassifier):
                     ai, aj = 0.0, total
             alpha[i], alpha[j] = ai, aj
 
-            # G += Q[:, i] * delta_i + Q[:, j] * delta_j
             grad += y * (y[i] * (ai - old_i) * K_i + y[j] * (aj - old_j) * K_j)
             n_iter += 1
 
@@ -315,7 +298,6 @@ class SVM(BaseClassifier):
         y_signed = np.where(y == self.classes_[1], 1.0, -1.0)
         C = self._sample_C(y)
 
-        # Parameter kernel dibekukan saat fit agar set_params setelahnya tidak mengubah prediksi.
         self.kernel_ = kernel = _resolve_kernel(self.kernel)
         self.gamma_ = self._resolve_gamma(X)
         self.degree_ = self.degree
@@ -335,7 +317,6 @@ class SVM(BaseClassifier):
         if kernel == "linear":
             self.coef_ = self.dual_coef_ @ self.support_vectors_
         else:
-            # coef_ hanya terdefinisi untuk kernel linear; buang sisa fit sebelumnya.
             vars(self).pop("coef_", None)
         return self
 
@@ -359,19 +340,7 @@ class SVM(BaseClassifier):
 
 
 class PegasosSVM(BaseClassifier):
-    """SVM linear yang dilatih di bentuk primal dengan Pegasos (stochastic sub-gradient, mini-batch).
-
-    Meminimalkan lam/2 ||w||^2 + (1/n) sum_i c_i max(0, 1 - y_i (w.x_i + b)).
-    Bias dimasukkan sebagai fitur konstan 1 sehingga ikut teregularisasi (salah satu opsi bias yang dibahas paper),
-    agar langkah awal eta = 1/(lam t) yang besar tidak membuat bias berosilasi.
-    Padanan dengan SVM dual: lam = 1 / (C * n).
-
-    Tidak memerlukan matriks kernel, sehingga dapat dilatih pada seluruh data dalam O(n_epochs * n * d).
-    """
-
-    # Referensi:
-    # - S. Shalev-Shwartz, Y. Singer, N. Srebro, A. Cotter, "Pegasos: Primal Estimated sub-GrAdient
-    #   SOlver for SVM", Mathematical Programming 127(1), 2011, hlm. 3-30.
+    """SVM linear yang dilatih di bentuk primal dengan Pegasos (stochastic sub-gradient, mini-batch)."""
 
     def __init__(
         self,

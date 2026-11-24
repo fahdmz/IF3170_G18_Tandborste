@@ -9,7 +9,6 @@ from src.models.base import BaseClassifier
 def _is_missing_scalar(val) -> bool:
     if val is None:
         return True
-    # pandas.NA without importing pandas. Scratch models may only use NumPy.
     if type(val).__name__ == "NAType":
         return True
     if isinstance(val, (float, np.floating)):
@@ -107,12 +106,10 @@ class NaiveBayes(BaseClassifier):
         self.n_features_in_ = n_features
         self.categorical_indices_, self.numerical_indices_ = self._resolve_feature_indices(n_features)
 
-        # Class counts and priors
         self.class_count_ = np.array([np.sum(y_arr == c) for c in self.classes_], dtype=float)
         self.class_prior_ = self.class_count_ / float(n_samples)
         self.class_log_prior_ = np.log(self.class_prior_)
 
-        # Numerical Gaussian fitting
         n_num = len(self.numerical_indices_)
         self.theta_ = np.full((n_classes, n_num), np.nan, dtype=float)
         self.var_ = np.full((n_classes, n_num), np.nan, dtype=float)
@@ -174,7 +171,6 @@ class NaiveBayes(BaseClassifier):
         else:
             self.epsilon_ = 0.0
 
-        # Categorical Laplace fitting
         self.categories_ = []
         self.cat_to_idx_ = []
         self.category_count_ = []
@@ -255,7 +251,6 @@ class NaiveBayes(BaseClassifier):
             point_matches = np.zeros((n_samples, n_classes), dtype=int)
             support = np.ones((n_samples, n_classes), dtype=bool)
 
-        # Numerical likelihood
         numerical_positions = np.flatnonzero(self.numerical_observed_)
         if len(numerical_positions) > 0:
             numerical_indices = [self.numerical_indices_[f_idx] for f_idx in numerical_positions]
@@ -291,7 +286,6 @@ class NaiveBayes(BaseClassifier):
 
                 jll[:, i] += np.sum(feat_ll, axis=1)
 
-        # Categorical likelihood
         if len(self.categorical_indices_) > 0:
             for k, col_idx in enumerate(self.categorical_indices_):
                 col = X_arr[:, col_idx]

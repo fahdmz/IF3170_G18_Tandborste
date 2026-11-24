@@ -1,10 +1,4 @@
-"""Scenario tests for Anggota 4.
-
-Each case is a small booking table with several awkward values at once:
-mixed scales, a free stay, an outlier, a near-copy of a column, imbalance,
-and a batch size that does not divide the sample count. Assertions look at
-the whole fit, not at a single zero or one.
-"""
+"""Scenario tests for Anggota 4."""
 
 import warnings
 from pathlib import Path
@@ -158,7 +152,6 @@ def test_elasticnet_on_messy_stays_matches_sklearn_and_keeps_every_row(guest_spl
     np.testing.assert_allclose(proba.sum(axis=1), 1.0)
     np.testing.assert_allclose(proba[:, 1], 1.0 / (1.0 + np.exp(-np.clip(own_scores, -500, 500))))
     assert set(np.unique(model.predict(x_te))).issubset({0, 1})
-    # The free stay and the 365-day lead are still rows, not dropped.
     assert len(model.predict(x_te)) == len(raw_test)
 
 

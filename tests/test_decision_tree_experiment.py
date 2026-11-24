@@ -47,7 +47,6 @@ def _make_synthetic_hotel_data(
         df["booking_channel"] = pd.Series(
             rng.choice(["Online", "Direct", "Corporate"], size=n), dtype=object
         )
-        # Inject missing values across numeric and categorical columns
         df.loc[0, "nightly_rate_idr"] = np.nan
         df.loc[1, "num_children"] = np.nan
         df.loc[2, "meal_package"] = None
@@ -66,14 +65,12 @@ def _make_synthetic_hotel_data(
     prob = 1.0 / (1.0 + np.exp(-signal))
     y_train = pd.Series((rng.random(n_train) < prob).astype(int), name=config.TARGET_COL)
 
-    # Inject duplicate and zero-guest rows in train (clean_train should drop them on outer train only)
     X_train.loc[n_train - 2] = X_train.loc[10]
     y_train.loc[n_train - 2] = y_train.loc[10]
     X_train.loc[n_train - 1, "num_adults"] = 0.0
     X_train.loc[n_train - 1, "num_children"] = 0.0
 
     X_test = _build_features(n_test)
-    # Inject duplicate and zero-guest rows in test to verify transform never drops test rows
     X_test.loc[n_test - 2] = X_test.loc[5]
     X_test.loc[n_test - 1, "num_adults"] = 0.0
     X_test.loc[n_test - 1, "num_children"] = 0.0
@@ -153,7 +150,6 @@ def test_missing_dataset_raises_clear_error_without_writing_artifacts(
 ):
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-    # Only create train.csv; leave test.csv and sample_submission.csv missing
     (data_dir / "train.csv").write_text("id,is_canceled\n", encoding="utf-8")
 
     out_dir = tmp_path / "output"
@@ -251,11 +247,9 @@ def test_roc_auc_uses_positive_class_1_column_even_when_classes_reordered():
 
     y_val = np.array([0, 0, 1, 1])
     X_dummy = np.zeros((4, 2))
-    # Standard order [0, 1]: column 1 has high prob for y=1
     standard = _StubClassifier(
         [0, 1], [[0.9, 0.1], [0.8, 0.2], [0.2, 0.8], [0.1, 0.9]]
     )
-    # Reversed order [1, 0]: column 0 has high prob for y=1
     reversed_cls = _StubClassifier(
         [1, 0], [[0.1, 0.9], [0.2, 0.8], [0.8, 0.2], [0.9, 0.1]]
     )
@@ -273,16 +267,13 @@ def test_threshold_selection_macro_f1_and_deterministic_tie_breaking():
     assert 0.50 in dtl_exp.THRESHOLD_CANDIDATES
     assert len(dtl_exp.THRESHOLD_CANDIDATES) == 91
 
-    # Optimal threshold clearly away from 0.50 (at 0.30, all positives >= 0.30 and negatives < 0.30)
     y_true = np.array([0, 0, 0, 1, 1, 1])
     y_proba = np.array([0.10, 0.20, 0.25, 0.32, 0.40, 0.45])
     res = dtl_exp.select_macro_f1_threshold(y_true, y_proba)
-    # Perfect separation for every t in [0.26, 0.32]; closest to 0.50 is 0.32
     assert res["threshold"] == 0.32
     assert res["oof_macro_f1"] == pytest.approx(1.0)
     assert res["oof_macro_f1"] > res["oof_macro_f1_at_0_50"]
 
-    # Equal-distance tie around 0.50 (0.42 vs 0.58 - tricky IEEE-754 pair): must pick smaller (0.42)
     tie_res = dtl_exp.select_macro_f1_threshold(
         y_true=np.array([0, 0, 1, 1]),
         y_proba=np.array([0.10, 0.20, 0.80, 0.90]),
@@ -290,7 +281,6 @@ def test_threshold_selection_macro_f1_and_deterministic_tie_breaking():
     )
     assert tie_res["threshold"] == 0.42
 
-    # Asymmetric tie: 0.46 is closer to 0.50 than 0.60
     closer_res = dtl_exp.select_macro_f1_threshold(
         y_true=np.array([0, 0, 1, 1]),
         y_proba=np.array([0.10, 0.20, 0.80, 0.90]),
@@ -309,7 +299,6 @@ def test_fit_receives_only_training_rows_and_holdout_never_enters_search(
         monkeypatch, tmp_path, X_train, y_train, X_test, test_ids, sample_sub
     )
 
-    # Record the exact holdout split so we can assert no fit ever sees holdout/test rows
     expected_tr, expected_va, expected_y_tr, _ = dtl_exp.sk_train_test_split(
         X_train, y_train, test_size=0.2, stratify=y_train, random_state=config.SEED
     )
@@ -365,7 +354,6 @@ def test_fit_receives_only_training_rows_and_holdout_never_enters_search(
     monkeypatch.setattr(dtl_exp, "evaluate_holdout", _record_holdout)
     monkeypatch.setattr(DecisionTree, "fit", _record_fit)
 
-    # Run 1: real holdout labels
     res1 = dtl_exp.run_experiment(
         search="grid",
         grid_param_space={"max_depth": [4, 6], "min_samples_leaf": [5, 10]},
@@ -385,7 +373,6 @@ def test_fit_receives_only_training_rows_and_holdout_never_enters_search(
         eval_fold_sizes
     )
 
-    # Run 2: flip holdout y_val labels ONLY (outer train unchanged) -> search & threshold MUST match
     orig_split = dtl_exp.sk_train_test_split
 
     def _flipped_holdout_split(*args, **kwargs):
@@ -409,7 +396,6 @@ def test_fit_receives_only_training_rows_and_holdout_never_enters_search(
         == res2["threshold_selection"]["oof_macro_f1"]
     )
     assert res1["tuned"]["c45_tuned"]["cv_5fold"] == res2["tuned"]["c45_tuned"]["cv_5fold"]
-    # Holdout scores should differ because y_val was flipped
     assert (
         res1["tuned"]["c45_tuned"]["holdout"]["macro_f1"]
         != res2["tuned"]["c45_tuned"]["holdout"]["macro_f1"]
@@ -490,7 +476,6 @@ def test_baseline_none_mode_writes_only_baseline_artifacts(monkeypatch, tmp_path
     baseline_dir = dirs["output_dir"] / "decision_tree" / "baseline"
     assert (baseline_dir / "comparison.csv").is_file()
     assert (baseline_dir / "run.json").is_file()
-    # Tuned artifacts must NOT exist in --search none
     assert not (dirs["output_dir"] / "decision_tree" / "run.json").exists()
     assert not (dirs["output_dir"] / "dtl_tuning_comparison.csv").exists()
     assert not (dirs["model_dir"] / "decision_tree_tuned.pkl").exists()
@@ -518,7 +503,6 @@ def test_grid_mode_artifacts_schema_reload_and_reproducibility(monkeypatch, tmp_
         top_n=12,
     )
 
-    # Verify all expected artifacts exist
     comp_path = dirs["output_dir"] / "decision_tree" / "comparison.csv"
     json_path = dirs["output_dir"] / "decision_tree" / "run.json"
     team_csv_path = dirs["output_dir"] / "dtl_tuning_comparison.csv"
@@ -530,7 +514,6 @@ def test_grid_mode_artifacts_schema_reload_and_reproducibility(monkeypatch, tmp_
     for p in (comp_path, json_path, team_csv_path, model_path, pipe_path, dot_path, png_path):
         assert p.is_file(), f"Missing artifact: {p}"
 
-    # Validate JSON structure and strict compliance (no NaN/Infinity)
     raw_json = json_path.read_text(encoding="utf-8")
     assert "NaN" not in raw_json and "Infinity" not in raw_json
     parsed = json.loads(raw_json)
@@ -542,7 +525,6 @@ def test_grid_mode_artifacts_schema_reload_and_reproducibility(monkeypatch, tmp_
     assert parsed["kaggle_readiness"]["submission_written"] is False
     assert parsed["kaggle_readiness"]["transformed_rows"] == len(X_test)
 
-    # Best params must actually match best trial from 3-fold grid search
     trials = parsed["grid_search"]["c45"]["trials"]
     assert len(trials) == 4
     expected_best = max(trials, key=lambda t: t["mean_score"])["params"]
@@ -553,7 +535,6 @@ def test_grid_mode_artifacts_schema_reload_and_reproducibility(monkeypatch, tmp_
         == expected_best["min_samples_leaf"]
     )
 
-    # Validate comparison.csv schema & protocols
     with open(comp_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         assert reader.fieldnames == ["model", "protocol", "fold", "metric", "value"]
@@ -566,7 +547,6 @@ def test_grid_mode_artifacts_schema_reload_and_reproducibility(monkeypatch, tmp_
         "holdout",
     } <= protocols
 
-    # Validate team summary CSV format
     with open(team_csv_path, encoding="utf-8") as f:
         team_reader = csv.DictReader(f)
         assert team_reader.fieldnames == dtl_exp.TEAM_COMPARISON_COLUMNS
@@ -581,7 +561,6 @@ def test_grid_mode_artifacts_schema_reload_and_reproducibility(monkeypatch, tmp_
     )
     assert by_key[("Decision Tree (tuned)", "from-scratch")]["cv_mean_macro_f1_at_0_50"] != ""
 
-    # Verify saved model + pipeline reload cleanly and produce valid binary test predictions
     reloaded_model = DecisionTree.load(model_path)
     with open(pipe_path, "rb") as f:
         reloaded_pipe = pickle.load(f)
@@ -593,7 +572,6 @@ def test_grid_mode_artifacts_schema_reload_and_reproducibility(monkeypatch, tmp_
     assert dot_path.read_text(encoding="utf-8").startswith("digraph DecisionTree {")
     assert png_path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
-    # Reproducibility check: second run yields identical best params, threshold, CV, and holdout
     run2 = dtl_exp.run_experiment(
         search="grid",
         grid_param_space={"max_depth": [4, 6], "min_samples_leaf": [5, 10]},

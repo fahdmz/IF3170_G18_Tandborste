@@ -1,13 +1,4 @@
-"""Logistic regression experiments on the hotel-booking dataset.
-
-Run from the repository root:
-    python -m src.experiments.logistic_regression
-
-Tuning uses the team's ``cross_validate`` (a new pipeline and ``clone`` on
-every fold). The scratch-versus-sklearn comparison uses the same fold
-matrices and the team's metrics. scikit-learn's ``C`` is
-``1 / (reg_lambda * n_train)`` so its penalty matches this mean log-loss.
-"""
+"""Logistic regression experiments on the hotel-booking dataset."""
 
 import itertools
 import time
@@ -45,10 +36,7 @@ LABEL_METRICS = {
 
 
 def load_clean():
-    """Return cleaned training features, labels, and the numeric and categorical column lists.
-
-    Duplicate rows and zero-guest rows are removed from the training set only.
-    """
+    """Return cleaned training features, labels, and the numeric and categorical column lists."""
     X, y = data.load_train()
     numerical, categorical = data.get_feature_types()
     return (*clean_train(X, y), numerical, categorical)
@@ -70,12 +58,7 @@ def _config(penalty, reg_lambda, learning_rate, batch_size, class_weight) -> dic
 
 
 def logreg_grid() -> list[dict]:
-    """Small grid over penalty, ``reg_lambda``, learning rate, batch size, and class weight.
-
-    The main block crosses L1, L2, and elastic net with three penalty strengths
-    and both class-weight choices. Two extra L2 rows vary the learning rate
-    and switch on mini-batches of 512.
-    """
+    """Small grid over penalty, ``reg_lambda``, learning rate, batch size, and class weight."""
     grid = [
         _config(penalty, reg_lambda, 0.5, None, class_weight)
         for penalty, reg_lambda, class_weight in itertools.product(
@@ -114,11 +97,7 @@ def adam_grid() -> list[dict]:
 
 
 def _score_row(params, scores, elapsed):
-    """Flatten one configuration into means and standard deviations across folds.
-
-    ``elapsed`` is the total time of the five-fold run; ``fit_sec`` stores the
-    per-fold average.
-    """
+    """Flatten one configuration into means and standard deviations across folds."""
     row = dict(params)
     for name, values in scores.items():
         row[name] = float(np.mean(values))
@@ -128,11 +107,7 @@ def _score_row(params, scores, elapsed):
 
 
 def tune(grid, model_cls, X, y, pipeline_factory, cv) -> pd.DataFrame:
-    """Score every configuration with the team's ``cross_validate`` and sort by macro F1.
-
-    Convergence warnings are hidden here so a short iteration budget does not
-    bury the table. The returned frame is ordered from the highest macro F1.
-    """
+    """Score every configuration with the team's ``cross_validate`` and sort by macro F1."""
     rows = []
     for index, params in enumerate(grid, start=1):
         model = model_cls(**params)
@@ -149,12 +124,7 @@ def tune(grid, model_cls, X, y, pipeline_factory, cv) -> pd.DataFrame:
 
 
 def prepare_folds(X, y, numerical, categorical, n_splits=5):
-    """Return ``(X_train, y_train, X_val, y_val)`` for each stratified fold.
-
-    The numeric pipeline is fit on the training rows of that fold and only
-    applied to the validation rows, so the two implementations later see the
-    same matrices.
-    """
+    """Return ``(X_train, y_train, X_val, y_val)`` for each stratified fold."""
     folds = []
     cv = StratifiedKFold(n_splits, True, config.SEED)
     for train_idx, val_idx in cv.split(X, y):
@@ -175,12 +145,7 @@ def prepare_folds(X, y, numerical, categorical, n_splits=5):
 
 
 def _sklearn_model(params, n_train):
-    """Saga logistic regression whose penalty matches ``params`` on ``n_train`` rows.
-
-    ``C = 1 / (reg_lambda * n_train)`` because this implementation penalizes
-    the mean log-loss while saga penalizes the sum and then divides by
-    ``n_train``. No penalty, or a zero ``reg_lambda``, becomes ``C=inf``.
-    """
+    """Saga logistic regression whose penalty matches ``params`` on ``n_train`` rows."""
     shared = dict(
         solver="saga",
         max_iter=5000,
@@ -215,12 +180,7 @@ def _evaluate_split(y_true, y_pred, y_score):
 
 
 def compare_with_sklearn(configs: dict[str, dict], folds) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Compare each scratch configuration with saga on the same folds.
-
-    Returns the per-fold table and a summary of means. Confusion counts in
-    the summary are sums across folds. ``C`` is computed from that fold's
-    training size.
-    """
+    """Compare each scratch configuration with saga on the same folds."""
     rows = []
     for name, params in configs.items():
         for impl in ("scratch", "sklearn"):
@@ -270,11 +230,7 @@ def compare_with_sklearn(configs: dict[str, dict], folds) -> tuple[pd.DataFrame,
 
 
 def _params_from_row(row, fields):
-    """Turn one tuning row back into constructor arguments.
-
-    A DataFrame stores a missing batch size or class weight as NaN. Those
-    become ``None``, and integer fields are cast back from floating values.
-    """
+    """Turn one tuning row back into constructor arguments."""
     params = {}
     for field in fields:
         value = row[field]
@@ -291,11 +247,7 @@ def _params_from_row(row, fields):
 
 
 def save_best_model(params, X, y, numerical, categorical):
-    """Fit ``params`` on the full cleaned training matrix and pickle the model.
-
-    The pipeline is fit on that same matrix. The file is
-    ``output/models/logistic_regression.pkl``.
-    """
+    """Fit ``params`` on the full cleaned training matrix and pickle the model."""
     pipeline = make_numeric_pipeline(numerical, categorical)
     features, _ = to_model_input(pipeline.fit_transform(X, y), categorical)
     model = LogisticRegression(**params)
@@ -308,11 +260,7 @@ def save_best_model(params, X, y, numerical, categorical):
 
 
 def save_contour_gif():
-    """Fit a one-feature L2 model with history and write the contour GIF.
-
-    The feature is drawn from ``make_classification`` and standardized. The
-    animation is ``output/figures/logreg_contour.gif``.
-    """
+    """Fit a one-feature L2 model with history and write the contour GIF."""
     features, labels = make_classification(
         n_samples=300,
         n_features=1,

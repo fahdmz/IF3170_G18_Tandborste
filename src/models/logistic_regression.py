@@ -1,10 +1,4 @@
-"""Binary logistic regression with batch and mini-batch gradient descent.
-
-The objective is the weighted mean log-loss plus a penalty on the weights only
-(the intercept is not penalized). With sample weights equal to 1 this matches
-scikit-learn's binary logistic regression when
-``C = 1 / (reg_lambda * n_train)``: saga scales its penalty by ``1 / n_samples``.
-"""
+"""Binary logistic regression with batch and mini-batch gradient descent."""
 
 import warnings
 from numbers import Integral, Real
@@ -32,12 +26,7 @@ def _softplus(z):
 
 
 def _soft_threshold(coef, threshold):
-    """Proximal map of ``threshold * ||w||_1``.
-
-    Shrinks each weight toward zero by ``threshold`` and sets it to zero when
-    its absolute value is smaller than that. N. Parikh and S. Boyd, "Proximal
-    Algorithms", Foundations and Trends in Optimization 1(3), 2014, section 6.5.2.
-    """
+    """Proximal map of ``threshold * ||w||_1``."""
     return np.sign(coef) * np.maximum(np.abs(coef) - threshold, 0.0)
 
 
@@ -56,12 +45,7 @@ def _validate_class_weight(class_weight):
 
 
 def _sample_weights(class_weight, classes, y):
-    """One weight per training row.
-
-    ``None`` weighs every row by 1. ``"balanced"`` uses
-    ``n_samples / (n_classes * count(label))``, matching scikit-learn. A dict
-    maps labels to weights and treats a missing label as weight 1.
-    """
+    """One weight per training row."""
     if class_weight is None:
         table = {label: 1.0 for label in classes}
     elif class_weight == "balanced":
@@ -72,12 +56,7 @@ def _sample_weights(class_weight, classes, y):
 
 
 def _penalty_terms(penalty, reg_lambda, l1_ratio):
-    """Return ``(l2_strength, l1_strength)`` for ``(l2/2)||w||^2 + l1||w||_1``.
-
-    The intercept is never included. ``"elasticnet"`` mixes the two strengths
-    with ``l1_ratio``. ``None`` and ``"none"`` turn both strengths off, and a
-    zero ``reg_lambda`` does the same for L1, L2, and elastic net.
-    """
+    """Return ``(l2_strength, l1_strength)`` for ``(l2/2)||w||^2 + l1||w||_1``."""
     if penalty is None or penalty == "none":
         return 0.0, 0.0
     if penalty == "l2":
@@ -88,11 +67,7 @@ def _penalty_terms(penalty, reg_lambda, l1_ratio):
 
 
 def _objective(X, y, weights, coef, intercept, l2, l1):
-    """Weighted mean log-loss plus the L2 and L1 penalties on ``coef``.
-
-    ``y`` is 0/1 for the positive class. A step that overflows the squared
-    weight norm is reported as infinite loss instead of a NumPy warning.
-    """
+    """Weighted mean log-loss plus the L2 and L1 penalties on ``coef``."""
     z = X @ coef + intercept
     with np.errstate(over="ignore", invalid="ignore"):
         data = np.mean(weights * (_softplus(z) - y * z))
@@ -103,11 +78,7 @@ def _objective(X, y, weights, coef, intercept, l2, l1):
 
 
 def _gradients(X, y, weights, coef, intercept):
-    """Mean gradient of the weighted log-loss for the weights and the intercept.
-
-    Divides by the number of rows in this call, so a mini-batch uses the same
-    step size scale as a full batch. The L2 term is added later by the optimizer.
-    """
+    """Mean gradient of the weighted log-loss for the weights and the intercept."""
     residual = weights * (_sigmoid(X @ coef + intercept) - y)
     scale = float(len(y))
     return (X.T @ residual) / scale, float(residual.sum() / scale)
@@ -131,11 +102,7 @@ class _GradientDescent:
 
 
 class _Adam:
-    """Bias-corrected Adam step, with L1 applied by a scaled soft-threshold.
-
-    D. P. Kingma and J. Ba, "Adam: A Method for Stochastic Optimization",
-    ICLR 2015, Algorithm 1. Moments start at zero on every fit.
-    """
+    """Bias-corrected Adam step, with L1 applied by a scaled soft-threshold."""
 
     def __init__(self, learning_rate, fit_intercept, beta1, beta2, epsilon, n_features):
         self.learning_rate = learning_rate
@@ -171,20 +138,7 @@ class _Adam:
 
 
 class LogisticRegression(BaseClassifier):
-    """Binary logistic regression fit by proximal gradient descent.
-
-    ``batch_size=None`` uses the full training set on every step. An integer
-    batch size shuffles the rows with ``_rng`` once per epoch. L1, and the L1
-    part of elastic net, is applied by soft-thresholding after the smooth step.
-    The penalty never touches the intercept.
-
-    After ``fit``, ``classes_``, ``coef_`` with shape ``(n_features,)``,
-    ``intercept_``, ``n_iter_``, ``converged_``, and ``loss_history_`` are set.
-    ``record_history=True`` also stores ``coef_history_`` and
-    ``intercept_history_``, including the zero start. ``classes_[1]`` is the
-    positive class: its logit is ``decision_function`` and its probability is
-    column 1 of ``predict_proba``.
-    """
+    """Binary logistic regression fit by proximal gradient descent."""
 
     def __init__(
         self,
@@ -245,13 +199,7 @@ class LogisticRegression(BaseClassifier):
         return _GradientDescent(self.learning_rate, self.fit_intercept)
 
     def _prepare_training(self, X, y):
-        """Validate inputs and return ``(X, classes, y_positive, sample_weights)``.
-
-        ``y_positive`` is 1 where the label equals ``classes_[1]`` and 0
-        otherwise, so string or boolean labels share the same loss as 0/1.
-        Numeric labels are checked for NaN before the class count, so a
-        missing label is not reported as a third class.
-        """
+        """Validate inputs and return ``(X, classes, y_positive, sample_weights)``."""
         self._validate_params()
         X = np.asarray(X, dtype=float)
         y = np.asarray(y).ravel()
@@ -273,13 +221,7 @@ class LogisticRegression(BaseClassifier):
         return X, classes, y_bin, weights
 
     def fit(self, X, y):
-        """Fit on a finite numeric matrix and exactly two classes.
-
-        Stops when the full-data loss changes by less than ``tol`` or the loss
-        becomes non-finite. Otherwise it runs ``n_iter`` epochs and warns.
-        Attributes are replaced only after a successful pass over the data, so
-        a rejected input leaves a previously fitted model unchanged.
-        """
+        """Fit on a finite numeric matrix and exactly two classes."""
         X, classes, y_bin, weights = self._prepare_training(X, y)
         n_samples, n_features = X.shape
         l2, l1 = _penalty_terms(self.penalty, self.reg_lambda, self.l1_ratio)
@@ -372,17 +314,7 @@ class LogisticRegression(BaseClassifier):
 
 
 class AdamLogisticRegression(LogisticRegression):
-    """Logistic regression trained with bias-corrected Adam.
-
-    Penalties, class weights, and the predict interface match
-    ``LogisticRegression``. Mini-batch order is the only use of ``_rng``.
-    ``beta1`` and ``beta2`` are the first and second moment decays, and
-    ``epsilon`` keeps the second-moment denominator away from zero.
-
-    D. P. Kingma and J. Ba, "Adam: A Method for Stochastic Optimization",
-    ICLR 2015, Algorithm 1. The L1 part uses the same soft-threshold as
-    gradient descent, scaled by the Adam second-moment denominator.
-    """
+    """Logistic regression trained with bias-corrected Adam."""
 
     def __init__(
         self,

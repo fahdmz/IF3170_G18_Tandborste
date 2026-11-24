@@ -1,8 +1,4 @@
-"""Bug-hunt checks across the project.
-
-Assertions describe the behavior the shared interface asks for. A failure is
-evidence; these tests do not weaken the expected result to match the code.
-"""
+"""Bug-hunt checks across the project."""
 
 import numpy as np
 import pandas as pd

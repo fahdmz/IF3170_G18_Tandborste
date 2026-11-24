@@ -30,8 +30,6 @@ def mixed_tree():
         return TreeNode(True, int(np.argmax(counts)), np.array(counts),
                         n_samples=sum(counts), depth=depth)
 
-    # Eight nodes: root, two internal children, then five leaves. Deliberately
-    # insert branches out of order so exports must order them deterministically.
     left = TreeNode(False, 0, np.array([3.25, 3.25]), feature_index=1,
                     is_categorical=True, n_samples=6.5, depth=1,
                     children={"C": leaf([1.0, 0.0], 2),
@@ -156,8 +154,6 @@ def test_png_renders_only_selected_nodes_and_edges_headlessly(tmp_path, mixed_tr
 
     def capture(figure, *args, **kwargs):
         axis = figure.axes[0]
-        # Edge backgrounds also have bbox patches; identify node labels by
-        # their required mass field, rather than matplotlib's box internals.
         saved["nodes"] = [text.get_text() for text in axis.texts if "\nmass = " in text.get_text()]
         saved["edges"] = len(axis.lines)
         saved["figure"] = figure
@@ -175,7 +171,7 @@ def test_png_renders_only_selected_nodes_and_edges_headlessly(tmp_path, mixed_tr
     else:
         assert "$room_type$ (categorical)" in saved["nodes"][1]
     assert plt.get_fignums() == before
-    assert not saved["figure"].axes  # Release artists even when no pyplot window exists.
+    assert not saved["figure"].axes
 
 
 def test_exports_are_deterministic_and_do_not_mutate_tree(tmp_path, mixed_tree):

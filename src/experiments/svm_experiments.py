@@ -1,15 +1,4 @@
-"""Eksperimen SVM pada dataset asli: tuning Macro F1 dan perbandingan from scratch vs sklearn.
-
-Jalankan dari root repo:
-    python -m src.experiments.svm_experiments            # perbandingan + Pegasos, tulis ke output/svm_comparison/
-    python -m src.experiments.svm_experiments --tune     # tambah grid tuning SVM (lama, ~1 jam di 10 core)
-    python -m src.experiments.svm_experiments --team-cv  # perbandingan dengan cross_validate milik tim
-
-Tuning dan `compare_with_sklearn` memakai fold, Macro F1, dan ROC AUC NumPy buatan modul ini, karena
-`cross_validate` tim hanya meneruskan label ke metrik (tidak bisa skor kontinu seperti ROC AUC atau threshold).
-`team_cv_comparison` mengulang perbandingan utama dengan `src.evaluation` tim agar angkanya konsisten dengan anggota lain.
-sklearn hanya dipakai sebagai pembanding.
-"""
+"""Eksperimen SVM pada dataset asli: tuning Macro F1 dan perbandingan from scratch vs sklearn."""
 import argparse
 import itertools
 import os
@@ -93,10 +82,7 @@ def prepare_folds(use_pca: bool = False, n_splits: int = 5) -> list[tuple[np.nda
 
 
 def cv_scores(model, folds) -> dict:
-    """Macro F1 threshold 0, Macro F1 dengan threshold cross-fitted, dan AUC rata-rata per fold.
-
-    Threshold untuk fold k dipilih dari skor out-of-fold fold lain, sehingga tidak bocor ke fold k.
-    """
+    """Macro F1 threshold 0, Macro F1 dengan threshold cross-fitted, dan AUC rata-rata per fold."""
     oof, fit_sec = [], []
     for A_tr, y_tr, A_va, y_va in folds:
         start = time.time()
@@ -141,7 +127,6 @@ def _sklearn_counterpart(model, n_train: int):
     from sklearn.svm import SVC, LinearSVC
 
     if isinstance(model, PegasosSVM):
-        # LinearSVC (liblinear) juga meregularisasi intercept, sama dengan Pegasos dengan fitur konstan.
         return LinearSVC(C=1.0 / (model.lam * n_train), loss="hinge", max_iter=100_000,
                          class_weight=model.class_weight, random_state=config.SEED)
     return SVC(kernel=model.kernel, C=model.C, degree=model.degree, gamma=model.gamma, coef0=model.coef0,
@@ -154,7 +139,6 @@ def _compare_one(job):
     for k, (A_tr, y_tr, A_va, y_va) in enumerate(folds):
         own = model.clone()
         if isinstance(own, SVM):
-            # Kedua implementasi dilatih pada baris yang persis sama (hasil subsampling yang sama).
             own.classes_ = np.unique(y_tr)
             A_tr, y_tr = own._subsample(A_tr, y_tr)
         start = time.time()

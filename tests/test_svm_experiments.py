@@ -19,7 +19,7 @@ from src.models.svm import SVM, PegasosSVM
 def test_metrics_match_sklearn():
     rng = np.random.default_rng(0)
     y = rng.integers(0, 2, 500)
-    score = np.round(rng.normal(size=500) + y, 1)  # dibulatkan agar ada ties
+    score = np.round(rng.normal(size=500) + y, 1)
     pred = (score > 0.5).astype(int)
     assert np.isclose(macro_f1(y, pred), f1_score(y, pred, average="macro"))
     assert np.isclose(roc_auc(y, score), roc_auc_score(y, score))

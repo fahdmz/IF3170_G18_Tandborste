@@ -66,12 +66,7 @@ def train_test_split(
     stratify: bool = True,
     random_state: int = SEED,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-    """Split rows with a test count of round(len(X) * test_size).
-
-    Stratification allocates that count proportionally while keeping every
-    class represented in both splits. An infeasible allocation raises
-    ValueError instead of changing the requested total.
-    """
+    """Split rows with a test count of round(len(X) * test_size)."""
     n_samples = len(X)
     if len(y) != n_samples:
         raise ValueError(f"Length mismatch: len(X)={n_samples} != len(y)={len(y)}")
@@ -221,15 +216,7 @@ def cross_validate(
     metrics: dict[str, Callable[[np.ndarray, np.ndarray], float]],
     resampler: BaseResampler | None = None,
 ) -> dict[str, list[float]]:
-    """Evaluate label metrics on each fold using independently cloned resamplers.
-
-    Custom clone() implementations must preserve configuration and return an
-    independent, unfitted resampler. Resamplers without a clone protocol are
-    deep-copied and should be unfitted templates. Compute ROC AUC separately
-    from validation-fold scores.
-    The pipeline receives the original DataFrames; model fit and prediction
-    receive NumPy arrays after preprocessing and any training-only resampling.
-    """
+    """Evaluate label metrics on each fold using independently cloned resamplers."""
     n_samples = len(X)
     if len(y) != n_samples:
         raise ValueError(f"Length mismatch: len(X)={n_samples} != len(y)={len(y)}")

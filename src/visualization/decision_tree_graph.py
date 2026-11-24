@@ -9,11 +9,7 @@ from matplotlib.figure import Figure
 
 
 def plot_decision_tree(model, path, top_n=None, feature_names=None):
-    """Save a PNG with at most top_n BFS nodes, counting the root.
-
-    Call this helper externally; the model only exports DOT. An Agg canvas
-    avoids GUI/display requirements without changing the notebook's backend.
-    """
+    """Save a PNG with at most top_n BFS nodes, counting the root."""
     model._check_is_fitted()
     path = Path(path)
     if path.suffix.lower() != ".png":
@@ -26,7 +22,6 @@ def plot_decision_tree(model, path, top_n=None, feature_names=None):
     if len(names) != model.n_features_in_:
         raise ValueError("feature_names must match n_features_in_")
 
-    # Keep this small traversal independent of the model's DOT serializer.
     nodes, edges, hidden = [(model.tree_, 0)], [], {}
     index = 0
     while index < len(nodes):
@@ -90,6 +85,4 @@ def plot_decision_tree(model, path, top_n=None, feature_names=None):
         path.parent.mkdir(parents=True, exist_ok=True)
         figure.savefig(path, format="png", dpi=150, bbox_inches="tight", pad_inches=0.25)
     finally:
-        # Direct Figure/Agg usage never registers a pyplot window. Clear the
-        # artists as well, including when writing fails.
         figure.clear()

@@ -14,7 +14,6 @@ def test_entropy_from_weighted_counts(counts, expected):
 
 
 def test_split_math_uses_mass_instead_of_row_count():
-    # Parent [1.5, 1.5]; left H=H(3/4,1/4), right H=0.
     gain, info, ratio = dt._split_statistics([[1.5, 0.5], [0, 1]], 3)
     assert gain == pytest.approx(0.4591479170272448)
     assert info == pytest.approx(0.9182958340544896)
@@ -28,7 +27,6 @@ def test_degenerate_split_has_zero_ratio(counts, total):
 
 
 def test_missing_gain_and_split_info_use_known_entropy_and_unknown_bucket():
-    # W=6, K=4, known counts [3,1], and branch masses [3,1,2].
     gain, info, ratio = dt._split_statistics([[3, 0], [0, 1]], 6)
     assert gain == pytest.approx(0.5408520829727552)
     assert info == pytest.approx(1.4591479170272448)
@@ -76,7 +74,7 @@ def test_leaf_mass_limit_is_applied_after_fractional_distribution():
     split = DecisionTree(min_samples_leaf=2)._numeric_split(
         np.array([0, 1, np.nan, np.nan]), np.array([0, 1, 0, 1]), np.ones(4), 0
     )
-    assert split is not None  # Known masses 1+1 become effective masses 2+2.
+    assert split is not None
     assert split["gain"] == pytest.approx(0.5)
 
 
@@ -90,7 +88,6 @@ def test_numeric_midpoint_is_finite_and_separates_neighbors(values):
 
 
 def test_numeric_threshold_maximizes_gain_before_ratio():
-    # Split after row 0 has larger ratio, but split after row 2 has larger gain.
     split = DecisionTree()._numeric_split(
         np.arange(8), np.array([0, 1, 0, 1, 1, 1, 1, 1]), np.ones(8), 0
     )
@@ -106,7 +103,6 @@ def test_equal_gain_threshold_and_feature_ties_are_deterministic():
 
 
 def test_average_gain_guard_rejects_high_ratio_low_gain_feature():
-    # Feature 0 isolates one positive; feature 1 provides much more information.
     y = np.array([0] * 50 + [1] * 50)
     X = np.column_stack([
         [0] * 99 + [1],
@@ -309,7 +305,7 @@ def test_fractional_missing_hand_calculated_fixture(missing, categorical):
     np.testing.assert_allclose(model.predict_proba([[values[0]]]), [[5 / 6, 1 / 6]])
     np.testing.assert_allclose(model.predict_proba([[values[3]]]), [[1 / 6, 5 / 6]])
     if categorical:
-        assert list(root.children) == ["A", "B"]  # No explicit missing child.
+        assert list(root.children) == ["A", "B"]
         np.testing.assert_allclose(model.predict_proba([["unseen"]]), [[2 / 3, 1 / 3]])
 
 
@@ -338,15 +334,12 @@ def test_literal_nan_string_is_a_category_and_mixed_category_types_are_safe():
 
 @pytest.fixture
 def two_level_missing_tree():
-    # Known A=[8,2], B=[2,8]. Unknown root rows each send weight 1/2.
     X = np.array(
         [["A", 0]] * 6 + [["A", 1]] * 4 + [["B", 0]] * 4 + [["B", 1]] * 6
         + [[None, 0], [None, 1]], dtype=object,
     )
     y = np.array([0] * 6 + [0, 0, 1, 1] + [0, 0, 1, 1] + [1] * 6 + [1, 0])
     model = DecisionTree(categorical_features=[0], max_depth=2).fit(X, y)
-    # Isolate growth/multilevel routing: these weak descendants are correctly
-    # collapsed by pruning. No unpruned copy is retained by production fit.
     model.tree_ = model._grow_tree(X, y, np.ones(len(y)), frozenset([0]), 0)
     return model
 
@@ -357,7 +350,6 @@ def test_multilevel_mixture_uses_known_descendant_feature(two_level_missing_tree
     assert model.get_depth() == 2
     assert model.get_n_leaves() == 4
     X = np.array([[None, 0], ["new", 0], [np.nan, 1], [None, None]], dtype=object)
-    # For z=0: (1/2)*[12/13,1/13] + (1/2)*[4/9,5/9].
     expected = [[80 / 117, 37 / 117], [80 / 117, 37 / 117],
                 [37 / 117, 80 / 117], [0.5, 0.5]]
     np.testing.assert_allclose(model.predict_proba(X), expected)
@@ -417,8 +409,6 @@ def test_predictions_and_refit_are_deterministic(two_level_missing_tree):
 
 
 def test_deep_tree_fit_does_not_depend_on_python_recursion_limit():
-    # Three observations per pure branch keep the splits useful after pruning;
-    # one alternating observation per branch is correctly pruned as noise.
     X = np.repeat(np.arange(1100), 3).reshape(-1, 1)
     y = np.repeat(np.arange(1100) % 2, 3)
     model = DecisionTree().fit(X, y)
@@ -449,8 +439,6 @@ def test_missing_prediction_traverses_deep_tree_without_recursion():
     ],
 )
 def test_pessimistic_error_estimate_hand_calculated(mass, error, expected):
-    # CF=.25: E(10,0)=10*(1-.25**.1); fractional e interpolates total E.
-    # For N=.5, interpolate (.0,.46875) to (.5,.5), never to e=1.
     actual = dt._estimated_errors(mass, error)
     assert actual == pytest.approx(expected)
     assert np.isfinite(actual) and 0 <= actual <= mass
@@ -479,7 +467,6 @@ def _split_node(children, categorical=False, depth=0):
 
 @pytest.mark.parametrize("categorical", [False, True])
 def test_pruning_collapses_uninformative_split_and_preserves_node_statistics(categorical):
-    # E(10,2)=3.51858 < 2*E(5,1)=4.50067: replacing this split is cheaper.
     root = _split_node({"le": _leaf([4, 1]), "gt": _leaf([4, 1])}, categorical)
     before = (root.prediction, root.n_samples, root.impurity, root.depth)
     counts = root.class_distribution.copy()
@@ -493,7 +480,6 @@ def test_pruning_collapses_uninformative_split_and_preserves_node_statistics(cat
 
 
 def test_pruning_keeps_informative_split():
-    # E(20,10)=11.97839 > 2*E(10,0)=2.58899: retain the pure branches.
     root = _split_node({"le": _leaf([10, 0]), "gt": _leaf([0, 10])})
     error = DecisionTree()._prune_tree(root)
     assert error == pytest.approx(2.588988734077517)
@@ -502,7 +488,6 @@ def test_pruning_keeps_informative_split():
 
 
 def test_pruning_exact_tie_prefers_leaf():
-    # A redundant one-child fixture has exactly E(10,2) on both sides.
     root = _split_node({"only": _leaf([8, 2])})
     DecisionTree()._prune_tree(root)
     assert root.is_leaf and not root.children
@@ -514,8 +499,6 @@ def test_pruning_is_bottom_up_and_introspection_ignores_removed_nodes():
     root = _split_node({"le": left, "gt": right})
     model = DecisionTree().fit([[0]], [0])
     model.tree_ = root
-    # 2*E(10,4) < E(20,10) < 4*E(5,2): comparing the original leaves
-    # would incorrectly collapse the root; compare the pruned children first.
     model._prune_tree(root)
     assert not root.is_leaf and left.is_leaf and right.is_leaf
     assert not left.children and not right.children
@@ -542,7 +525,6 @@ def test_fit_prunes_after_growth_and_missing_uses_surviving_child_masses():
     assert not model.tree_.is_leaf
     np.testing.assert_allclose(model.predict_proba([[None], ["unseen"], ["A"], ["B"]]),
                                [[0.7, 0.3], [0.7, 0.3], [0.9, 0.1], [0.1, 0.9]])
-    # A weak real split grows, but pessimistic error prefers its parent leaf.
     X, y = np.arange(5).reshape(-1, 1), np.array([0, 0, 1, 0, 0])
     grown = DecisionTree(max_depth=1)._grow_tree(X, y, np.ones(5), frozenset(), 0)
     assert not grown.is_leaf
@@ -561,8 +543,6 @@ def test_missing_multilevel_prediction_after_pruning_retains_known_descendant_fe
     assert not root.children["A"].is_leaf and root.children["B"].is_leaf
     assert model.get_n_leaves() == 3
     np.testing.assert_allclose([child.n_samples for child in root.children.values()], [31, 31])
-    # A retains [18.5,0] and [2,10.5]; B collapses to [.5,30.5].
-    # Unknown root mixes each with prior 1/2 while preserving numeric z.
     queries = [[None, 0], ["unseen", 0], [np.nan, 1], [None, None]]
     np.testing.assert_allclose(model.predict_proba(queries),
                                [[63 / 124, 61 / 124], [63 / 124, 61 / 124],

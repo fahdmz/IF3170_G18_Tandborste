@@ -19,14 +19,7 @@ from src.models.logistic_regression import (
 
 
 def plot_logreg_contour(model: LogisticRegression, X: np.ndarray, y: np.ndarray, output_path: Path | str | None = None) -> Path:
-    """Save a GIF of the training path on the log-loss surface of a one-feature model.
-
-    ``model`` must already be fit with ``record_history=True``. The horizontal
-    axis is the intercept and the vertical axis is the single weight. The
-    surface uses the same weighted mean log-loss and penalty as ``fit``,
-    including ``class_weight``. The default file is
-    ``output/figures/logreg_contour.gif``.
-    """
+    """Save a GIF of the training path on the log-loss surface of a one-feature model."""
     model._check_is_fitted()
     X = np.asarray(X, dtype=float)
     y = np.asarray(y).ravel()
@@ -75,11 +68,7 @@ def plot_logreg_contour(model: LogisticRegression, X: np.ndarray, y: np.ndarray,
 
 
 def _loss_grid(x, y_bin, weights, theta0, theta1, l2, l1):
-    """Loss on a grid that pads the recorded ``(intercept, weight)`` path.
-
-    Returns the loss values, the intercept mesh, and the weight mesh. The
-    path itself is not drawn here; the caller animates it on top.
-    """
+    """Loss on a grid that pads the recorded ``(intercept, weight)`` path."""
     pad0 = 0.2 * (float(theta0.max() - theta0.min()) + 1.0)
     pad1 = 0.2 * (float(theta1.max() - theta1.min()) + 1.0)
     axis0 = np.linspace(float(theta0.min()) - pad0, float(theta0.max()) + pad0, 70)

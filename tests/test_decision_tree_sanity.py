@@ -55,8 +55,6 @@ def test_numeric_sanity_against_sklearn_entropy():
             pending.extend(node.children.values())
     np.testing.assert_array_equal(X_train, original_train)
     np.testing.assert_array_equal(X_validation, original_validation)
-    # Gain ratio, pessimistic pruning, multiway categories and missing routing
-    # differ from sklearn. The 3% target is diagnostic, never an equality gate.
     gap = abs(results["c45"]["accuracy"] - results["sklearn"]["accuracy"])
     print(json.dumps({"seed": SEED, "train_rows": len(y_train), "validation_rows": len(y_validation),
                       "majority_accuracy": baseline, "accuracy_gap": gap, "models": results}, sort_keys=True))

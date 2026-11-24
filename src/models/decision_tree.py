@@ -13,14 +13,8 @@ _PRUNING_CF = 0.25
 _PRUNING_Z = NormalDist().inv_cdf(1 - _PRUNING_CF)
 
 
-# Upper-confidence error mathematics (with continuity correction) from Weka Stats:
-# https://raw.githubusercontent.com/Waikato/weka-3.8/master/weka/src/main/java/weka/classifiers/trees/j48/Stats.java
 def _estimated_errors(mass, error):
-    """Total pessimistic error E(N,e), approximated for effective float mass.
-
-    This is not bit-for-bit Weka: for N<1, interpolation ends at (N,N)
-    instead of evaluating an impossible observed error of 1.
-    """
+    """Total pessimistic error E(N,e), approximated for effective float mass."""
     if mass <= _EPS:
         return 0.0
     error = min(mass, max(0.0, error))
@@ -59,15 +53,8 @@ def _entropy(counts):
     return -(probabilities * logs).sum(axis=-1)
 
 
-# Missing-value formulas follow Weka's mathematical C4.5 criteria:
-# https://github.com/Waikato/weka-3.8/blob/master/weka/src/main/java/weka/classifiers/trees/j48/InfoGainSplitCrit.java
-# https://github.com/Waikato/weka-3.8/blob/master/weka/src/main/java/weka/classifiers/trees/j48/GainRatioSplitCrit.java
 def _split_statistics(branch_counts, total_weight):
-    """Return adjusted gain, split info (with unknown bucket), and ratio.
-
-    The last two axes are known branches and classes; leading axes allow
-    scoring all numeric boundaries together without repeatedly sorting.
-    """
+    """Return adjusted gain, split info (with unknown bucket), and ratio."""
     counts = np.asarray(branch_counts, dtype=float)
     if total_weight <= 0:
         zeros = np.zeros(counts.shape[:-2])
@@ -103,11 +90,7 @@ class TreeNode:
 
 
 class DecisionTree(BaseClassifier):
-    """C4.5-style tree with fractional missing values and pessimistic pruning.
-
-    Splits and leaf limits use effective sample mass. Fractional routing can
-    expand work on deep trees; max_depth and the sample limits control growth.
-    """
+    """C4.5-style tree with fractional missing values and pessimistic pruning."""
 
     def __init__(
         self,
@@ -189,9 +172,6 @@ class DecisionTree(BaseClassifier):
             "split_info": float(info), "gain_ratio": float(ratio),
         }
 
-    # Average-gain guard adapted conceptually from C45ModelSelection, without
-    # Weka's additional cardinality/MDL heuristics:
-    # https://github.com/Waikato/weka-3.8/blob/master/weka/src/main/java/weka/classifiers/trees/j48/C45ModelSelection.java
     def _best_split(self, X, y, weights, categorical_features):
         candidates = []
         for feature in range(X.shape[1]):
@@ -211,8 +191,6 @@ class DecisionTree(BaseClassifier):
             elif abs(candidate["gain_ratio"] - best["gain_ratio"]) <= _EPS:
                 if candidate["gain"] > best["gain"] + _EPS:
                     best = candidate
-                # Features are visited in index order; numeric ties already
-                # chose the smaller threshold.
         return best
 
     def _validate_parameters(self, n_features):
@@ -247,8 +225,6 @@ class DecisionTree(BaseClassifier):
         return frozenset(indices)
 
     def _validate_X(self, X, categorical_features):
-        # Object conversion preserves mixed Python numeric/string values and
-        # never turns a real NaN into the literal category "nan".
         try:
             X = np.array(X, dtype=object, copy=True)
         except (TypeError, ValueError) as exc:
@@ -281,8 +257,6 @@ class DecisionTree(BaseClassifier):
     def _grow_tree(self, X, y, weights, categorical_features, depth):
         root = TreeNode(is_leaf=True)
         pending = [(root, X, y, weights, depth)]
-        # An explicit stack also supports valid, very unbalanced trees when
-        # max_depth=None, without depending on Python's recursion limit.
         while pending:
             node, X, y, weights, depth = pending.pop()
             counts = np.bincount(y, weights=weights, minlength=2)
@@ -319,8 +293,7 @@ class DecisionTree(BaseClassifier):
                     ("gt", known & (numbers > split["threshold"])),
                 ]
             known_mass = float(weights[known].sum())
-            # Known rows keep their weight. Each unknown row contributes w*q_b
-            # to every child, preserving both total mass and per-class counts.
+            # Unknown rows send weight w*q_b to every child.
             for key, mask in branches:
                 prior = float(weights[mask].sum()) / known_mass
                 child_weights = weights * np.where(unknown, prior, mask.astype(float))
@@ -351,7 +324,6 @@ class DecisionTree(BaseClassifier):
             if node.is_leaf:
                 errors.append(leaf_error)
                 continue
-            # Post-order leaves one error total per processed child on the stack.
             child_count = len(node.children)
             subtree_error = sum(errors[-child_count:])
             del errors[-child_count:]
@@ -387,7 +359,6 @@ class DecisionTree(BaseClassifier):
         y = y.astype(np.intp)
         tree = self._grow_tree(X, y, np.ones(len(y)), categorical_features, 0)
         self._prune_tree(tree)
-        # Publish fitted state only after the whole fit succeeds, including refits.
         self.tree_ = tree
         self.n_features_in_ = X.shape[1]
         self._categorical_features_ = categorical_features
@@ -409,8 +380,6 @@ class DecisionTree(BaseClassifier):
                 if key in current.children:
                     pending.append((current.children[key], path_weight))
                     continue
-            # Missing/unseen routing retains all other known feature values.
-            # Multiplying priors along a path gives the multilevel mixture.
             total = sum(child.n_samples for child in current.children.values())
             if total <= 0 or not np.isfinite(total):
                 probabilities += path_weight * (current.class_distribution / current.n_samples)
@@ -461,11 +430,7 @@ class DecisionTree(BaseClassifier):
         return leaves
 
     def export_graph(self, path, top_n=None, feature_names=None):
-        """Write UTF-8 DOT; top_n limits actual BFS nodes, including the root.
-
-        Hidden branches are noted on their displayed parent. This serializer
-        only reads fitted nodes and has no dependency on a graphics renderer.
-        """
+        """Write UTF-8 DOT; top_n limits actual BFS nodes, including the root."""
         from pathlib import Path
 
         self._check_is_fitted()
@@ -485,7 +450,6 @@ class DecisionTree(BaseClassifier):
                 "\r\n", "\n"
             ).replace("\r", "\n").replace("\n", "\\n")
 
-        # IDs and the queue are local: never attach export state to TreeNode.
         nodes, edges, hidden = [self.tree_], [], {}
         index = 0
         while index < len(nodes):
